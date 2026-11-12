@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>What Day Was It?</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,600;12..96,800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --bg:#dde6f0; --card:#ffffff; --ink:#1b2a41; --muted:#5b6b82; --line:#c3cfde;
+  --btn:#eef3f9; --btn-hover:#e1e9f3; --good:#1f7a4d; --good-bg:#d6f0e2; --bad:#b83a30; --bad-bg:#f9dedb;
+  box-sizing:border-box;
+  padding-top:env(safe-area-inset-top,0px); padding-bottom:env(safe-area-inset-bottom,0px);
+  color-scheme:light;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#121a28; --card:#1c2739; --ink:#e8eef7; --muted:#93a3ba; --line:#2f3d55;
+    --btn:#243148; --btn-hover:#2d3c57; --good:#6fd6a0; --good-bg:#16402c; --bad:#ff8f84; --bad-bg:#4a211e;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#121a28; --card:#1c2739; --ink:#e8eef7; --muted:#93a3ba; --line:#2f3d55;
+  --btn:#243148; --btn-hover:#2d3c57; --good:#6fd6a0; --good-bg:#16402c; --bad:#ff8f84; --bad-bg:#4a211e;
+  color-scheme:dark;
+}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{
+  margin:0; min-height:100vh; background:var(--bg); color:var(--ink);
+  font-family:"Bricolage Grotesque",system-ui,-apple-system,"Segoe UI",sans-serif;
+  display:flex; align-items:center; justify-content:center; padding:20px;
+}
+main{width:100%; max-width:520px}
+.card{
+  background:var(--card); border:2px solid var(--line); border-radius:18px; overflow:hidden;
+}
+.top{
+  background:var(--ink); color:var(--card); padding:12px 20px; font-size:.95rem; font-weight:600;
+  display:flex; justify-content:space-between;
+}
+.date{
+  padding:44px 20px 36px; text-align:center; font-weight:800; line-height:1.05;
+  font-size:clamp(2.1rem,8.5vw,3.3rem); letter-spacing:-.02em; text-wrap:balance;
+}
+.date small{display:block; font-size:.4em; font-weight:600; color:var(--muted); letter-spacing:0; margin-bottom:.6em}
+.days{display:grid; gap:8px; padding:0 16px 16px}
+.days button{
+  font:inherit; font-size:1.05rem; font-weight:600; color:var(--ink); background:var(--btn);
+  border:2px solid var(--line); border-radius:10px; padding:13px 16px; cursor:pointer; text-align:left;
+  transition:background .12s, border-color .12s;
+}
+@media (hover:hover){.days button:hover:not(:disabled){background:var(--btn-hover)}}
+.days button:focus-visible,.next:focus-visible{outline:3px solid var(--ink); outline-offset:2px}
+.days button:disabled{cursor:default}
+.days button.right{background:var(--good-bg); border-color:var(--good); color:var(--good)}
+.days button.wrong{background:var(--bad-bg); border-color:var(--bad); color:var(--bad)}
+.days button.right::after{content:"  ✓"}
+.days button.wrong::after{content:"  ✗"}
+.result{
+  min-height:3.2em; padding:0 20px 8px; text-align:center; font-weight:600; font-size:1.1rem;
+}
+.result.good{color:var(--good)} .result.bad{color:var(--bad)}
+.foot{padding:0 16px 18px; min-height:56px}
+.next{
+  width:100%; font:inherit; font-weight:800; font-size:1.05rem; background:var(--ink); color:var(--card);
+  border:0; border-radius:10px; padding:14px; cursor:pointer; visibility:hidden;
+}
+.next.show{visibility:visible}
+.hint{text-align:center; color:var(--muted); font-size:.85rem; margin:12px 0 0}
+.avg{padding:12px 20px; border-top:2px solid var(--line); text-align:center; color:var(--muted); font-size:.9rem; font-weight:600; min-height:2.9em}
+@media (min-width:760px){
+  main{max-width:940px}
+  .date{padding:34px 20px 28px}
+  .days{grid-template-columns:repeat(7,1fr); gap:8px}
+  .days button{text-align:center; padding:18px 4px; font-size:.98rem}
+  .result{min-height:2.6em}
+}
+@media (min-width:760px) and (max-height:720px){
+  .date{padding:20px 20px 16px}
+  .days button{padding:12px 4px}
+  .foot{min-height:52px; padding-bottom:12px}
+  .avg{padding:8px 20px; min-height:2.4em}
+}
+.hist{position:fixed; right:calc(16px + env(safe-area-inset-right,0px)); bottom:calc(16px + env(safe-area-inset-bottom,0px)); z-index:20; display:flex; flex-direction:column-reverse; align-items:flex-end; gap:8px}
+.hist-toggle{font:inherit; font-weight:600; font-size:.9rem; color:var(--ink); background:var(--card); border:2px solid var(--line); border-radius:999px; padding:9px 16px; cursor:pointer}
+.hist-toggle:hover{background:var(--btn-hover)}
+.hist-toggle:focus-visible{outline:3px solid var(--ink); outline-offset:2px}
+.hist-panel{width:min(320px,calc(100vw - 32px)); max-height:60vh; overflow-y:auto; background:var(--card); border:2px solid var(--line); border-radius:14px; padding:6px 14px}
+.hist-panel[hidden]{display:none}
+.hist-panel ul{list-style:none; margin:0; padding:0}
+.hist-panel li{display:grid; grid-template-columns:1fr auto; gap:2px 12px; padding:10px 0; border-bottom:1px solid var(--line); font-size:.9rem}
+.hist-panel li:last-child{border-bottom:0}
+.hist-panel .d{font-weight:600}
+.hist-panel .t{color:var(--muted); text-align:right}
+.hist-panel .ok{color:var(--good); font-weight:600}
+.hist-panel .no{color:var(--bad); font-weight:600}
+.hist-empty{color:var(--muted); padding:12px 0; font-size:.9rem}
+.top{justify-content:flex-start; flex-wrap:wrap; gap:6px 20px}
+.top button{font:inherit; font-weight:600; font-size:.95rem; color:inherit; background:none; border:0; border-bottom:2px solid transparent; padding:2px 0; cursor:pointer; opacity:.6}
+.top button[aria-selected="true"]{opacity:1; border-bottom-color:currentColor}
+.top button:focus-visible{outline:2px solid currentColor; outline-offset:3px}
+.entry{display:flex; gap:8px; padding:0 16px 16px}
+.entry input{flex:1; min-width:0; font:inherit; font-size:1.4rem; font-weight:600; color:var(--ink); background:var(--btn); border:2px solid var(--line); border-radius:10px; padding:12px 16px; text-align:center}
+.entry input:focus-visible{outline:3px solid var(--ink); outline-offset:2px}
+.entry input:disabled{opacity:.7}
+.entry button{font:inherit; font-weight:800; font-size:1.05rem; color:var(--card); background:var(--ink); border:0; border-radius:10px; padding:0 26px; cursor:pointer}
+.entry button:disabled{opacity:.5; cursor:default}
+.entry #skip{background:var(--btn); color:var(--ink); border:2px solid var(--line); padding:0 18px}
+.entry #skip:hover{background:var(--btn-hover)}
+.entry button:focus-visible{outline:3px solid var(--ink); outline-offset:2px}
+@media (max-width:759px){
+  body{flex-direction:column; gap:12px; min-height:100dvh; padding:12px}
+  .date{padding:26px 16px 20px}
+  .days{grid-template-columns:1fr 1fr}
+  .days button{text-align:center}
+  .days button:last-child{grid-column:1/-1}
+  .top button{padding:8px 0}
+  .entry{flex-wrap:wrap}
+  .entry input{flex:1 1 100%; padding:12px 8px}
+  .entry button{flex:1; padding:14px 0}
+  .hist{position:static; width:100%; max-width:520px; align-items:center; flex-direction:column}
+  .hist-panel{width:100%; max-height:50vh}
+}
+@media (prefers-reduced-motion: reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<main>
+  <div class="card">
+    <div class="top" id="tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-m="weekday">Weekday</button><button type="button" role="tab" aria-selected="false" data-m="year">Year code</button><button type="button" role="tab" aria-selected="false" data-m="doomsday">Doomsday</button><button type="button" role="tab" aria-selected="false" data-m="earliest">Earliest</button></div>
+    <div class="date" id="date" aria-live="polite"></div>
+    <div class="days" id="days"></div>
+    <div class="entry" id="entry" style="display:none"><input id="ans" type="text" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Your answer" placeholder="Your answer"><button type="button" id="check">Check</button><button type="button" id="skip">Skip</button></div>
+    <div class="result" id="result" aria-live="assertive"></div>
+    <div class="foot"><button class="next" id="next">Next date</button></div>
+    <div class="avg" id="avg"></div>
+  </div>
+  <p class="hint" id="hint">Keys 1–7 pick Monday–Sunday. Enter for the next date.</p>
+</main>
+<div class="hist">
+  <button type="button" class="hist-toggle" id="histBtn" aria-expanded="false" aria-controls="histPanel">Last 10 ▴</button>
+  <div class="hist-panel" id="histPanel" hidden></div>
+</div>
+<script>
+(function(){
+  var NAMES=["Monday","Tuesday","Wednesday","Thursday","Friday","Saturday","Sunday"];
+  var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
+  var dateEl=document.getElementById("date"), daysEl=document.getElementById("days"),
+      resultEl=document.getElementById("result"), nextBtn=document.getElementById("next");
+  var answer=0, answered=false, buttons=[];
+  var avgEl=document.getElementById("avg"), times=[], shownAt=0;
+  var log=[], histBtn=document.getElementById("histBtn"), histPanel=document.getElementById("histPanel");
+  function renderHist(){
+    histPanel.textContent="";
+    if(!log.length){
+      var e=document.createElement("div"); e.className="hist-empty"; e.textContent="No answers yet.";
+      histPanel.appendChild(e); return;
+    }
+    var ul=document.createElement("ul");
+    log.forEach(function(r){
+      var li=document.createElement("li");
+      var d=document.createElement("span"); d.className="d"; d.textContent=r.d;
+      var t=document.createElement("span"); t.className="t"; t.textContent=(r.ms/1000).toFixed(1)+"s";
+      var s=document.createElement("span"); s.className=r.ok?"ok":"no";
+      s.textContent=r.ok?"✓ Correct":"✗ Incorrect ("+r.day+")";
+      li.appendChild(d); li.appendChild(t); li.appendChild(s);
+      ul.appendChild(li);
+    });
+    histPanel.appendChild(ul);
+  }
+  histBtn.addEventListener("click",function(){
+    var open=histPanel.hidden;
+    histPanel.hidden=!open;
+    histBtn.setAttribute("aria-expanded",open?"true":"false");
+    histBtn.textContent=open?"Last 10 ▾":"Last 10 ▴";
+  });
+  renderHist();
+  function updateAvg(){
+    if(!times.length){avgEl.textContent=""; return;}
+    var sum=times.reduce(function(a,b){return a+b;},0);
+    avgEl.textContent="Average time, last "+times.length+": "+(sum/times.length/1000).toFixed(1)+"s";
+  }
+
+  function ordinal(n){
+    if(n%100>=11&&n%100<=13) return n+"th";
+    return n+(["th","st","nd","rd"][n%10]||"th");
+  }
+  function newRound(){
+    if(mode!=="weekday") return numRound();
+    var start=Date.UTC(2000,0,1), end=Date.UTC(2026,11,31);
+    var days=Math.round((end-start)/86400000);
+    var d=new Date(start+Math.floor(Math.random()*(days+1))*86400000);
+    answer=(d.getUTCDay()+6)%7; // Monday = 0
+    answered=false;
+    shownAt=performance.now();
+    dateEl.textContent=ordinal(d.getUTCDate())+" of "+MONTHS[d.getUTCMonth()]+" "+d.getUTCFullYear();
+    resultEl.textContent=""; resultEl.className="result";
+    nextBtn.classList.remove("show");
+    buttons.forEach(function(b){b.disabled=false; b.className="";});
+  }
+  function pick(i){
+    if(answered) return;
+    answered=true;
+    times.push(performance.now()-shownAt);
+    if(times.length>10) times.shift();
+    updateAvg();
+    log.unshift({d:dateEl.textContent, ok:i===answer, day:NAMES[answer], ms:times[times.length-1]});
+    if(log.length>10) log.pop();
+    renderHist();
+    buttons.forEach(function(b){b.disabled=true;});
+    if(i===answer){
+      buttons[i].className="right";
+      resultEl.textContent="Correct! It was a "+NAMES[answer]+".";
+      resultEl.className="result good";
+    }else{
+      buttons[i].className="wrong";
+      buttons[answer].className="right";
+      resultEl.textContent="Not quite. It was a "+NAMES[answer]+".";
+      resultEl.className="result bad";
+    }
+    nextBtn.classList.add("show");
+    nextBtn.focus();
+  }
+  NAMES.forEach(function(n,i){
+    var b=document.createElement("button");
+    b.type="button"; b.textContent=n;
+    b.addEventListener("click",function(){pick(i);});
+    daysEl.appendChild(b); buttons.push(b);
+  });
+  nextBtn.addEventListener("click",newRound);
+  var mode="weekday", stores={}, acc=[], ansTxt="", missed=[], curE=null;
+  var entryEl=document.getElementById("entry"), ansEl=document.getElementById("ans"),
+      checkBtn=document.getElementById("check"), hintEl=document.getElementById("hint");
+  var HINTS={weekday:"Keys 1–7 pick Monday–Sunday. Enter for the next date.",
+    year:"Add the number to how many times 4 goes into it. Checks as you type; Enter submits early.",
+    doomsday:"Days from the month’s doomsday: 0 to 6, or negative (6 = −1). Enter to check."};
+  function fmt(r){return r===0?"0":r+" (or −"+(7-r)+")";}
+  function numRound(){
+    answered=false; shownAt=performance.now();
+    if(mode==="earliest"){
+      var dd2=[3,28,14,4,9,6,11,8,5,10,7,12], m2, lp;
+      if(missed.length&&missed[0].wait<=0){var q=missed.shift(); m2=q.m; lp=q.lp;}
+      else{
+        do{m2=Math.floor(Math.random()*12);}while(missed.length&&m2===missed[0].m);
+        lp=m2<2&&Math.random()<.5;
+        missed.forEach(function(x){x.wait--;});
+      }
+      curE={m:m2,lp:lp};
+      var e=(((dd2[m2]+(lp?1:0))-1)%7)+1;
+      acc=e===7?[7,0]:[e]; ansTxt=e===7?"7 (or 0)":String(e);
+      dateEl.textContent=MONTHS[m2]+(m2<2?(lp?" (leap year)":" (common year)"):"");
+    }else if(mode==="year"){
+      var n=Math.floor(Math.random()*100);
+      acc=[n+Math.floor(n/4)]; ansTxt=String(acc[0]);
+      dateEl.textContent=String(n);
+    }else{
+      var ml=[31,28,31,30,31,30,31,31,30,31,30,31], dd=[3,28,14,4,9,6,11,8,5,10,7,12];
+      var m=Math.floor(Math.random()*12), leap=m<2&&Math.random()<.5, day=1+Math.floor(Math.random()*(ml[m]+(leap&&m===1?1:0)));
+      var r=(((day-dd[m]-(leap?1:0))%7)+7)%7;
+      acc=[r]; ansTxt=fmt(r);
+      
+      dateEl.textContent=ordinal(day)+" of "+MONTHS[m]+(m<2?(leap?" (leap year)":" (common year)"):"");
+    }
+    ansEl.value=""; ansEl.disabled=false; checkBtn.disabled=false;
+    resultEl.textContent=""; resultEl.className="result";
+    nextBtn.classList.remove("show");
+    ansEl.focus();
+  }
+  function submit(){
+    if(answered) return;
+    var raw=ansEl.value.trim().replace(/\u2212/g,"-");
+    if(!/^[+-]?\d+$/.test(raw)){resultEl.textContent="Type a whole number."; resultEl.className="result"; return;}
+    var v=parseInt(raw,10), ok;
+    if(mode==="year"||mode==="earliest") ok=acc.indexOf(v)>-1;
+    else ok=Math.abs(v)<=6&&acc.indexOf(((v%7)+7)%7)>-1;
+    answered=true; ansEl.disabled=true; checkBtn.disabled=true;
+    if(mode==="earliest"&&!ok&&curE) missed.push({m:curE.m,lp:curE.lp,wait:1});
+    times.push(performance.now()-shownAt);
+    if(times.length>10) times.shift();
+    updateAvg();
+    log.unshift({d:dateEl.textContent, ok:ok, day:ansTxt, ms:times[times.length-1]});
+    if(log.length>10) log.pop();
+    renderHist();
+    var msg=(ok?"Correct! ":"Wrong. ")+dateEl.textContent+" → "+ansTxt+(ok?"":" (you typed "+raw+")");
+    var cls="result "+(ok?"good":"bad");
+    numRound(); resultEl.textContent=msg; resultEl.className=cls;
+  }
+  function setMode(m){
+    stores[mode]={t:times,l:log};
+    mode=m;
+    var s=stores[m]||{t:[],l:[]}; times=s.t; log=s.l;
+    var tabs=document.querySelectorAll("#tabs button");
+    for(var k=0;k<tabs.length;k++) tabs[k].setAttribute("aria-selected",tabs[k].getAttribute("data-m")===m?"true":"false");
+    daysEl.style.display=m==="weekday"?"":"none";
+    entryEl.style.display=m==="weekday"?"none":"";
+    ansEl.inputMode="numeric";
+    hintEl.textContent=m==="earliest"?"Type the earliest doomsday date in that month (1 to 7). Checks as you type.":HINTS[m];
+    updateAvg(); renderHist(); newRound();
+  }
+  document.getElementById("tabs").addEventListener("click",function(e){
+    var m=e.target.getAttribute("data-m");
+    if(m&&m!==mode) setMode(m);
+  });
+  checkBtn.addEventListener("click",submit);
+  document.getElementById("skip").addEventListener("click",function(){ if(mode!=="weekday") numRound(); });
+  ansEl.addEventListener("input",function(){
+    if((mode!=="year"&&mode!=="earliest")||answered) return;
+    var v=ansEl.value.replace(/\D/g,"");
+    if(v!==ansEl.value) ansEl.value=v;
+    if(!v) return;
+    var s=String(acc[0]);
+    if(v===s||v.length>=s.length) submit();
+  });
+  document.addEventListener("keydown",function(e){
+    if(mode==="weekday"&&e.key>="1"&&e.key<="7") pick(+e.key-1);
+    else if(e.key==="Enter"){ if(answered){ if(document.activeElement!==nextBtn) newRound(); } else if(mode!=="weekday") submit(); }
+  });
+  newRound();
+})();
+</script>
+</body>
+</html>
