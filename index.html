@@ -188,7 +188,7 @@ main{width:100%; max-width:520px}
     if(n%100>=11&&n%100<=13) return n+"th";
     return n+(["th","st","nd","rd"][n%10]||"th");
   }
-  var revealTimers=[], revealing=false, REVEAL_MS=300;
+  var revealTimers=[], revealing=false, REVEAL_MS=300, DELAY_MS=400;
   function clearReveal(){revealTimers.forEach(clearTimeout); revealTimers=[]; revealing=false;}
   function newRound(){
     clearReveal();
@@ -204,20 +204,20 @@ main{width:100%; max-width:520px}
       if(i===1) dateEl.appendChild(document.createTextNode(" of "));
       if(i===2) dateEl.appendChild(document.createTextNode(" "));
       var sp=document.createElement("span"); sp.textContent=t;
-      sp.style.visibility=i===0?"visible":"hidden";
+      sp.style.visibility="hidden";
       dateEl.appendChild(sp); spans.push(sp);
     });
     resultEl.textContent=""; resultEl.className="result";
     nextBtn.classList.remove("show");
     buttons.forEach(function(b){b.disabled=true; b.className="";});
-    [1,2].forEach(function(i){
+    [0,1,2].forEach(function(i){
       revealTimers.push(setTimeout(function(){
         spans[i].style.visibility="visible";
         if(i===2){
           revealing=false; shownAt=performance.now();
           buttons.forEach(function(b){b.disabled=false;});
         }
-      }, i*REVEAL_MS));
+      }, DELAY_MS+i*REVEAL_MS));
     });
   }
   function pick(i){
@@ -259,7 +259,8 @@ main{width:100%; max-width:520px}
     doomsday:"Days from the month’s doomsday: 0 to 6, or negative (6 = −1). Enter to check."};
   function fmt(r){return r===0?"0":r+" (or −"+(7-r)+")";}
   function numRound(){
-    answered=false; shownAt=performance.now();
+    clearReveal();
+    answered=false; revealing=true;
     if(mode==="earliest"){
       var dd2=[3,28,14,4,9,6,11,8,5,10,7,12], m2, lp;
       if(missed.length&&missed[0].wait<=0){var q=missed.shift(); m2=q.m; lp=q.lp;}
@@ -290,13 +291,20 @@ main{width:100%; max-width:520px}
       
       dateEl.textContent=ordinal(day)+" of "+MONTHS[m]+(m<2?(leap?" (leap year)":" (common year)"):"");
     }
+    var qText=dateEl.textContent;
+    dateEl.textContent="";
     ansEl.value=""; ansEl.disabled=false; checkBtn.disabled=false;
     resultEl.textContent=""; resultEl.className="result";
     nextBtn.classList.remove("show");
     ansEl.focus();
+    revealTimers.push(setTimeout(function(){
+      dateEl.textContent=qText;
+      revealing=false; shownAt=performance.now();
+      ansEl.focus();
+    }, DELAY_MS));
   }
   function submit(){
-    if(answered) return;
+    if(answered||revealing) return;
     var raw=ansEl.value.trim().replace(/\u2212/g,"-");
     if(!/^[+-]?\d+$/.test(raw)){resultEl.textContent="Type a whole number."; resultEl.className="result"; return;}
     var v=parseInt(raw,10), ok;
@@ -333,6 +341,7 @@ main{width:100%; max-width:520px}
   checkBtn.addEventListener("click",submit);
   document.getElementById("skip").addEventListener("click",function(){ if(mode!=="weekday") numRound(); });
   ansEl.addEventListener("input",function(){
+    if(revealing){ansEl.value=""; return;}
     if((mode!=="year"&&mode!=="earliest"&&mode!=="remainder")||answered) return;
     var v=ansEl.value.replace(/\D/g,"");
     if(v!==ansEl.value) ansEl.value=v;
