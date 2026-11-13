@@ -188,21 +188,40 @@ main{width:100%; max-width:520px}
     if(n%100>=11&&n%100<=13) return n+"th";
     return n+(["th","st","nd","rd"][n%10]||"th");
   }
+  var revealTimers=[], revealing=false, REVEAL_MS=300;
+  function clearReveal(){revealTimers.forEach(clearTimeout); revealTimers=[]; revealing=false;}
   function newRound(){
+    clearReveal();
     if(mode!=="weekday") return numRound();
     var start=Date.UTC(2000,0,1), end=Date.UTC(2026,11,31);
     var days=Math.round((end-start)/86400000);
     var d=new Date(start+Math.floor(Math.random()*(days+1))*86400000);
     answer=(d.getUTCDay()+6)%7; // Monday = 0
-    answered=false;
-    shownAt=performance.now();
-    dateEl.textContent=ordinal(d.getUTCDate())+" of "+MONTHS[d.getUTCMonth()]+" "+d.getUTCFullYear();
+    answered=false; revealing=true;
+    dateEl.textContent="";
+    var parts=[ordinal(d.getUTCDate()), MONTHS[d.getUTCMonth()], String(d.getUTCFullYear())], spans=[];
+    parts.forEach(function(t,i){
+      if(i===1) dateEl.appendChild(document.createTextNode(" of "));
+      if(i===2) dateEl.appendChild(document.createTextNode(" "));
+      var sp=document.createElement("span"); sp.textContent=t;
+      sp.style.visibility=i===0?"visible":"hidden";
+      dateEl.appendChild(sp); spans.push(sp);
+    });
     resultEl.textContent=""; resultEl.className="result";
     nextBtn.classList.remove("show");
-    buttons.forEach(function(b){b.disabled=false; b.className="";});
+    buttons.forEach(function(b){b.disabled=true; b.className="";});
+    [1,2].forEach(function(i){
+      revealTimers.push(setTimeout(function(){
+        spans[i].style.visibility="visible";
+        if(i===2){
+          revealing=false; shownAt=performance.now();
+          buttons.forEach(function(b){b.disabled=false;});
+        }
+      }, i*REVEAL_MS));
+    });
   }
   function pick(i){
-    if(answered) return;
+    if(answered||revealing) return;
     answered=true;
     times.push(performance.now()-shownAt);
     if(times.length>10) times.shift();
