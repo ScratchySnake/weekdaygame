@@ -235,7 +235,7 @@ main{width:100%; max-width:520px}
   var entryEl=document.getElementById("entry"), ansEl=document.getElementById("ans"),
       checkBtn=document.getElementById("check"), hintEl=document.getElementById("hint");
   var HINTS={weekday:"Keys 1–7 pick Monday–Sunday. Enter for the next date.",
-    year:"Add the number to how many times 4 goes into it. Checks as you type; Enter submits early.",
+    year:"Add the number to how many times 4 goes into it, then take mod 7 (0 to 6). Checks as you type; Enter submits early.",
     doomsday:"Days from the month’s doomsday: 0 to 6, or negative (6 = −1). Enter to check."};
   function fmt(r){return r===0?"0":r+" (or −"+(7-r)+")";}
   function numRound(){
@@ -254,7 +254,7 @@ main{width:100%; max-width:520px}
       dateEl.textContent=MONTHS[m2]+(m2<2?(lp?" (leap year)":" (common year)"):"");
     }else if(mode==="year"){
       var n=Math.floor(Math.random()*100);
-      acc=[n+Math.floor(n/4)]; ansTxt=String(acc[0]);
+      acc=[(n+Math.floor(n/4))%7]; ansTxt=String(acc[0]);
       dateEl.textContent=String(n);
     }else{
       var ml=[31,28,31,30,31,30,31,31,30,31,30,31], dd=[3,28,14,4,9,6,11,8,5,10,7,12];
