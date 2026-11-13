@@ -130,7 +130,7 @@ main{width:100%; max-width:520px}
 <body>
 <main>
   <div class="card">
-    <div class="top" id="tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-m="weekday">Weekday</button><button type="button" role="tab" aria-selected="false" data-m="year">Year code</button><button type="button" role="tab" aria-selected="false" data-m="remainder">Remainder Index</button><button type="button" role="tab" aria-selected="false" data-m="doomsday">Doomsday</button><button type="button" role="tab" aria-selected="false" data-m="earliest">Earliest</button></div>
+    <div class="top" id="tabs" role="tablist"><button type="button" role="tab" aria-selected="true" data-m="weekday">Weekday</button><button type="button" role="tab" aria-selected="false" data-m="year">Year code</button><button type="button" role="tab" aria-selected="false" data-m="doomsday">Doomsday</button><button type="button" role="tab" aria-selected="false" data-m="earliest">Earliest</button></div>
     <div class="date" id="date" aria-live="polite"></div>
     <div class="days" id="days"></div>
     <div class="entry" id="entry" style="display:none"><input id="ans" type="text" inputmode="numeric" maxlength="4" autocomplete="off" aria-label="Your answer" placeholder="Your answer"><button type="button" id="check">Check</button><button type="button" id="skip">Skip</button></div>
@@ -150,7 +150,7 @@ main{width:100%; max-width:520px}
   var MONTHS=["January","February","March","April","May","June","July","August","September","October","November","December"];
   var dateEl=document.getElementById("date"), daysEl=document.getElementById("days"),
       resultEl=document.getElementById("result"), nextBtn=document.getElementById("next");
-  var answer=0, answered=false, buttons=[], lastR=0;
+  var answer=0, answered=false, buttons=[];
   var avgEl=document.getElementById("avg"), times=[], shownAt=0;
   var log=[], histBtn=document.getElementById("histBtn"), histPanel=document.getElementById("histPanel");
   function renderHist(){
@@ -188,41 +188,22 @@ main{width:100%; max-width:520px}
     if(n%100>=11&&n%100<=13) return n+"th";
     return n+(["th","st","nd","rd"][n%10]||"th");
   }
-  var revealTimers=[], revealing=false, REVEAL_MS=300;
-  function clearReveal(){revealTimers.forEach(clearTimeout); revealTimers=[]; revealing=false;}
   function newRound(){
-    clearReveal();
     if(mode!=="weekday") return numRound();
     var start=Date.UTC(2000,0,1), end=Date.UTC(2026,11,31);
     var days=Math.round((end-start)/86400000);
     var d=new Date(start+Math.floor(Math.random()*(days+1))*86400000);
     answer=(d.getUTCDay()+6)%7; // Monday = 0
-    answered=false; revealing=true;
-    dateEl.textContent="";
-    var parts=[ordinal(d.getUTCDate()), MONTHS[d.getUTCMonth()], String(d.getUTCFullYear())], spans=[];
-    parts.forEach(function(t,i){
-      if(i===1) dateEl.appendChild(document.createTextNode(" of "));
-      if(i===2) dateEl.appendChild(document.createTextNode(" "));
-      var sp=document.createElement("span"); sp.textContent=t;
-      sp.style.visibility=i===0?"visible":"hidden";
-      dateEl.appendChild(sp); spans.push(sp);
-    });
+    answered=false;
+    shownAt=performance.now();
+    dateEl.textContent=ordinal(d.getUTCDate())+" of "+MONTHS[d.getUTCMonth()]+" "+d.getUTCFullYear();
     resultEl.textContent=""; resultEl.className="result";
     nextBtn.classList.remove("show");
-    buttons.forEach(function(b){b.disabled=true; b.className="";});
-    [1,2].forEach(function(i){
-      revealTimers.push(setTimeout(function(){
-        spans[i].style.visibility="visible";
-        if(i===2){
-          revealing=false; shownAt=performance.now();
-          buttons.forEach(function(b){b.disabled=false;});
-        }
-      }, i*REVEAL_MS));
-    });
+    buttons.forEach(function(b){b.disabled=false; b.className="";});
   }
   function pick(i){
-    if(answered||revealing) return;
-    answered=true;
+    if(answered) return;
+    answered=true; lockUntil=performance.now()+LOCK;
     times.push(performance.now()-shownAt);
     if(times.length>10) times.shift();
     updateAvg();
@@ -249,16 +230,21 @@ main{width:100%; max-width:520px}
     b.addEventListener("click",function(){pick(i);});
     daysEl.appendChild(b); buttons.push(b);
   });
-  nextBtn.addEventListener("click",newRound);
+  var DELAY=900, LOCK=450, lockUntil=0, pending=null;
+  function advance(){
+    if(mode==="weekday"&&answered&&performance.now()<lockUntil) return;
+    newRound();
+  }
+  nextBtn.addEventListener("click",advance);
   var mode="weekday", stores={}, acc=[], ansTxt="", missed=[], curE=null;
   var entryEl=document.getElementById("entry"), ansEl=document.getElementById("ans"),
       checkBtn=document.getElementById("check"), hintEl=document.getElementById("hint");
   var HINTS={weekday:"Keys 1–7 pick Monday–Sunday. Enter for the next date.",
-    year:"Add the number to how many times 4 goes into it, then take mod 7 (0 to 6). Checks as you type; Enter submits early.",
-    remainder:"Type the code for the remainder (1 to 11): add its 4s, then mod 7. Checks as you type.",
+    year:"Add the number to how many times 4 goes into it. Checks as you type; Enter submits early.",
     doomsday:"Days from the month’s doomsday: 0 to 6, or negative (6 = −1). Enter to check."};
   function fmt(r){return r===0?"0":r+" (or −"+(7-r)+")";}
   function numRound(){
+    if(pending){clearTimeout(pending); pending=null;}
     answered=false; shownAt=performance.now();
     if(mode==="earliest"){
       var dd2=[3,28,14,4,9,6,11,8,5,10,7,12], m2, lp;
@@ -272,15 +258,9 @@ main{width:100%; max-width:520px}
       var e=(((dd2[m2]+(lp?1:0))-1)%7)+1;
       acc=e===7?[7,0]:[e]; ansTxt=e===7?"7 (or 0)":String(e);
       dateEl.textContent=MONTHS[m2]+(m2<2?(lp?" (leap year)":" (common year)"):"");
-    }else if(mode==="remainder"){
-      var RI=[null,1,2,3,5,6,0,1,3,4,5,6], rn;
-      do{rn=1+Math.floor(Math.random()*11);}while(rn===lastR);
-      lastR=rn;
-      acc=[RI[rn]]; ansTxt=String(acc[0]);
-      dateEl.textContent=String(rn);
     }else if(mode==="year"){
       var n=Math.floor(Math.random()*100);
-      acc=[(n+Math.floor(n/4))%7]; ansTxt=String(acc[0]);
+      acc=[n+Math.floor(n/4)]; ansTxt=String(acc[0]);
       dateEl.textContent=String(n);
     }else{
       var ml=[31,28,31,30,31,30,31,31,30,31,30,31], dd=[3,28,14,4,9,6,11,8,5,10,7,12];
@@ -300,7 +280,7 @@ main{width:100%; max-width:520px}
     var raw=ansEl.value.trim().replace(/\u2212/g,"-");
     if(!/^[+-]?\d+$/.test(raw)){resultEl.textContent="Type a whole number."; resultEl.className="result"; return;}
     var v=parseInt(raw,10), ok;
-    if(mode==="year"||mode==="earliest"||mode==="remainder") ok=acc.indexOf(v)>-1;
+    if(mode==="year"||mode==="earliest") ok=acc.indexOf(v)>-1;
     else ok=Math.abs(v)<=6&&acc.indexOf(((v%7)+7)%7)>-1;
     answered=true; ansEl.disabled=true; checkBtn.disabled=true;
     if(mode==="earliest"&&!ok&&curE) missed.push({m:curE.m,lp:curE.lp,wait:1});
@@ -312,9 +292,13 @@ main{width:100%; max-width:520px}
     renderHist();
     var msg=(ok?"Correct! ":"Wrong. ")+dateEl.textContent+" → "+ansTxt+(ok?"":" (you typed "+raw+")");
     var cls="result "+(ok?"good":"bad");
-    numRound(); resultEl.textContent=msg; resultEl.className=cls;
+    resultEl.textContent=msg; resultEl.className=cls;
+    pending=setTimeout(function(){
+      pending=null; numRound(); resultEl.textContent=msg; resultEl.className=cls;
+    },DELAY);
   }
   function setMode(m){
+    if(pending){clearTimeout(pending); pending=null;}
     stores[mode]={t:times,l:log};
     mode=m;
     var s=stores[m]||{t:[],l:[]}; times=s.t; log=s.l;
@@ -333,7 +317,7 @@ main{width:100%; max-width:520px}
   checkBtn.addEventListener("click",submit);
   document.getElementById("skip").addEventListener("click",function(){ if(mode!=="weekday") numRound(); });
   ansEl.addEventListener("input",function(){
-    if((mode!=="year"&&mode!=="earliest"&&mode!=="remainder")||answered) return;
+    if((mode!=="year"&&mode!=="earliest")||answered) return;
     var v=ansEl.value.replace(/\D/g,"");
     if(v!==ansEl.value) ansEl.value=v;
     if(!v) return;
@@ -342,7 +326,7 @@ main{width:100%; max-width:520px}
   });
   document.addEventListener("keydown",function(e){
     if(mode==="weekday"&&e.key>="1"&&e.key<="7") pick(+e.key-1);
-    else if(e.key==="Enter"){ if(answered){ if(document.activeElement!==nextBtn) newRound(); } else if(mode!=="weekday") submit(); }
+    else if(e.key==="Enter"){ if(answered){ if(document.activeElement!==nextBtn) advance(); } else if(mode!=="weekday") submit(); }
   });
   newRound();
 })();
